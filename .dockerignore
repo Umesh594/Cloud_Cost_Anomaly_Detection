@@ -1,0 +1,8 @@
+**/bin
+**/obj
+.git
+.github
+infra/terraform/.terraform
+infra/terraform/*.tfstate
+infra/terraform/*.tfstate.backup
+README.md

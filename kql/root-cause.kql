@@ -1,0 +1,13 @@
+let anomalyDate = datetime({anomaly_date});
+let teamName = "{team}";
+ChargebackDaily
+| where Timestamp between (anomalyDate - 7d .. anomalyDate)
+| where Team == teamName
+| summarize DailyCost=sum(todouble(Cost)) by Timestamp, ServiceName
+| partition by ServiceName (
+    order by Timestamp asc
+    | extend PreviousCost = prev(DailyCost)
+    | extend Delta = DailyCost - PreviousCost
+)
+| where Timestamp == anomalyDate
+| order by Delta desc

@@ -1,0 +1,9 @@
+ChargebackDaily
+| where Timestamp between (startofday(ago(30d)) .. now())
+| summarize
+    TotalCost = round(sum(todouble(Cost)), 2),
+    AvgConfidence = round(avg(Confidence), 3),
+    Services = dcount(ServiceName),
+    Subscriptions = dcount(SubscriptionId)
+    by Team, Currency
+| order by TotalCost desc

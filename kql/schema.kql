@@ -1,0 +1,47 @@
+.create-merge table CostUsage (
+    UsageDate: datetime,
+    SubscriptionId: string,
+    ResourceId: string,
+    MeterCategory: string,
+    ServiceName: string,
+    Currency: string,
+    PretaxCost: decimal,
+    Tags: string
+)
+
+.create-merge table ChargebackDaily (
+    Timestamp: datetime,
+    Team: string,
+    SubscriptionId: string,
+    ServiceName: string,
+    Cost: decimal,
+    Currency: string,
+    Confidence: real,
+    AttributionSource: string
+)
+
+.create-or-alter function with (folder="FinOps", docstring="Daily team/service cost anomalies using ADX time-series decomposition")
+FinOps_DailyCostAnomalies(minimumDelta: real = 100.0) {
+    ChargebackDaily
+    | where Timestamp > ago(35d)
+    | make-series ActualCost=sum(todouble(Cost)) default=0
+        on Timestamp from startofday(ago(35d)) to startofday(now()) step 1d
+        by Team, ServiceName
+    | extend (Anomalies, Score, Baseline) = series_decompose_anomalies(ActualCost, 1.5, -1, "linefit")
+    | mv-expand Timestamp to typeof(datetime),
+        ActualCost to typeof(double),
+        Baseline to typeof(double),
+        Score to typeof(double),
+        Anomalies to typeof(double)
+    | where Anomalies == 1 and ActualCost - Baseline >= minimumDelta
+    | project
+        Timestamp,
+        Team,
+        ServiceName,
+        ActualCost,
+        ExpectedCost = Baseline,
+        Delta = ActualCost - Baseline,
+        Severity = round(min_of(1.0, abs(Score) / 5.0), 3),
+        Explanation = strcat(ServiceName, " spend for ", Team, " exceeded seasonal baseline by ", tostring(round(ActualCost - Baseline, 2)))
+    | order by Severity desc, Delta desc
+}

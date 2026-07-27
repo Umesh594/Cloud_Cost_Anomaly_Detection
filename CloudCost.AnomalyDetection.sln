@@ -1,0 +1,30 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CloudCost.Anomaly.Core", "src\CloudCost.Anomaly.Core\CloudCost.Anomaly.Core.csproj", "{0E8AAB32-9102-46E0-97F1-7A0C1DC6A01A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CloudCost.Anomaly.Worker", "src\CloudCost.Anomaly.Worker\CloudCost.Anomaly.Worker.csproj", "{F84977B1-0EC4-430F-880B-596FB8810D8B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CloudCost.Anomaly.Tests", "tests\CloudCost.Anomaly.Tests\CloudCost.Anomaly.Tests.csproj", "{44CF551A-3B80-4D21-A5B2-AC34B5A89393}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{0E8AAB32-9102-46E0-97F1-7A0C1DC6A01A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0E8AAB32-9102-46E0-97F1-7A0C1DC6A01A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0E8AAB32-9102-46E0-97F1-7A0C1DC6A01A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0E8AAB32-9102-46E0-97F1-7A0C1DC6A01A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F84977B1-0EC4-430F-880B-596FB8810D8B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F84977B1-0EC4-430F-880B-596FB8810D8B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F84977B1-0EC4-430F-880B-596FB8810D8B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F84977B1-0EC4-430F-880B-596FB8810D8B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{44CF551A-3B80-4D21-A5B2-AC34B5A89393}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{44CF551A-3B80-4D21-A5B2-AC34B5A89393}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{44CF551A-3B80-4D21-A5B2-AC34B5A89393}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{44CF551A-3B80-4D21-A5B2-AC34B5A89393}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

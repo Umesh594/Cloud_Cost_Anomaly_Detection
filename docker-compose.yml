@@ -1,0 +1,15 @@
+services:
+  cloud-cost-worker:
+    build: .
+    image: cloud-cost-anomaly-worker:local
+    environment:
+      AnomalyWorker__BillingScope: "${AZURE_BILLING_SCOPE:-}"
+      AnomalyWorker__AdxClusterUri: "${ADX_CLUSTER_URI:-}"
+      AnomalyWorker__AdxDatabase: "CloudCost"
+      AnomalyWorker__PollIntervalMinutes: "60"
+      AnomalyWorker__AlertMinimumCostDelta: "100"
+      AZURE_CLIENT_ID: "${AZURE_CLIENT_ID:-}"
+      AZURE_TENANT_ID: "${AZURE_TENANT_ID:-}"
+      AZURE_CLIENT_SECRET: "${AZURE_CLIENT_SECRET:-}"
+    volumes:
+      - ./infra/terraform:/app/infra/terraform:ro

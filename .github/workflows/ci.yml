@@ -1,0 +1,39 @@
+name: ci
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  build-test-image:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Restore
+        run: dotnet restore CloudCost.AnomalyDetection.sln
+      - name: Test
+        run: dotnet test CloudCost.AnomalyDetection.sln --configuration Release --no-restore --collect:"XPlat Code Coverage"
+      - name: Build image
+        run: docker build -t cloud-cost-anomaly-worker:${{ github.sha }} .
+
+  terraform-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - name: Init
+        working-directory: infra/terraform
+        run: terraform init -backend=false
+      - name: Format
+        working-directory: infra/terraform
+        run: terraform fmt -check
+      - name: Validate
+        working-directory: infra/terraform
+        run: terraform validate
