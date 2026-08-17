@@ -1,0 +1,63 @@
+-- Cloud Cost Anomaly Detection Power BI semantic measures.
+-- Data source: ADX function PowerBI_FinOpsExecutiveDataset(90).
+
+Total Cost :=
+SUM ( 'FinOpsDaily'[ActualCost] )
+
+Expected Cost :=
+SUM ( 'FinOpsDaily'[ExpectedCost] )
+
+Avoidable Spend :=
+SUM ( 'FinOpsDaily'[AvoidableSpend] )
+
+Cost Variance :=
+[Total Cost] - [Expected Cost]
+
+Cost Variance % :=
+DIVIDE ( [Cost Variance], [Expected Cost] )
+
+Anomaly Count :=
+CALCULATE (
+    COUNTROWS ( 'FinOpsDaily' ),
+    'FinOpsDaily'[IsAnomaly] = TRUE ()
+)
+
+High Severity Anomaly Count :=
+CALCULATE (
+    COUNTROWS ( 'FinOpsDaily' ),
+    'FinOpsDaily'[AnomalySeverity] >= 0.85
+)
+
+Average Attribution Confidence :=
+AVERAGE ( 'FinOpsDaily'[AvgAttributionConfidence] )
+
+Chargeback Coverage % :=
+DIVIDE (
+    CALCULATE ( [Total Cost], 'FinOpsDaily'[AvgAttributionConfidence] >= 0.80 ),
+    [Total Cost]
+)
+
+MTD Cost :=
+TOTALMTD ( [Total Cost], 'Date'[Date] )
+
+Prior MTD Cost :=
+CALCULATE ( [MTD Cost], DATEADD ( 'Date'[Date], -1, MONTH ) )
+
+MTD Cost Change % :=
+DIVIDE ( [MTD Cost] - [Prior MTD Cost], [Prior MTD Cost] )
+
+Top Anomaly Service :=
+VAR ranked =
+    TOPN (
+        1,
+        SUMMARIZE (
+            'FinOpsDaily',
+            'FinOpsDaily'[ServiceName],
+            "Severity", MAX ( 'FinOpsDaily'[AnomalySeverity] ),
+            "Avoidable", [Avoidable Spend]
+        ),
+        [Severity], DESC,
+        [Avoidable], DESC
+    )
+RETURN
+    CONCATENATEX ( ranked, 'FinOpsDaily'[ServiceName], ", " )

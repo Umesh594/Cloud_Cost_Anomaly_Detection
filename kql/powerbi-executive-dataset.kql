@@ -1,0 +1,53 @@
+// Power BI import/direct-query dataset for FinOps executive analytics.
+// Produces one grain per date/team/service with cost, attribution confidence,
+// anomaly severity, and avoidable spend markers.
+.create-or-alter function with (
+    folder = "PowerBI",
+    docstring = "BI-ready daily FinOps fact table for cost, anomaly, and chargeback reporting"
+)
+PowerBI_FinOpsExecutiveDataset(daysBack: int = 90) {
+    let DailyFacts =
+        ChargebackDaily
+        | where Timestamp between (startofday(ago(daysBack * 1d)) .. now())
+        | summarize
+            ActualCost = round(sum(todouble(Cost)), 2),
+            AvgAttributionConfidence = round(avg(Confidence), 3),
+            Subscriptions = dcount(SubscriptionId)
+            by Date = startofday(Timestamp), Team, ServiceName, Currency;
+    let AnomalyFacts =
+        FinOps_DailyCostAnomalies(25.0)
+        | project
+            Date = startofday(Timestamp),
+            Team,
+            ServiceName,
+            ExpectedCost = round(todouble(ExpectedCost), 2),
+            AnomalyDelta = round(todouble(Delta), 2),
+            AnomalySeverity = todouble(Severity),
+            AnomalyExplanation = Explanation;
+    DailyFacts
+    | join kind=leftouter AnomalyFacts on Date, Team, ServiceName
+    | extend
+        ExpectedCost = coalesce(ExpectedCost, ActualCost),
+        AnomalyDelta = coalesce(AnomalyDelta, 0.0),
+        AnomalySeverity = coalesce(AnomalySeverity, 0.0),
+        IsAnomaly = AnomalySeverity >= 0.65,
+        AvoidableSpend = iff(AnomalySeverity >= 0.65, max_of(AnomalyDelta, 0.0), 0.0),
+        Month = format_datetime(Date, "yyyy-MM"),
+        DateKey = toint(format_datetime(Date, "yyyyMMdd"))
+    | project
+        DateKey,
+        Date,
+        Month,
+        Team,
+        ServiceName,
+        Currency,
+        ActualCost,
+        ExpectedCost,
+        AnomalyDelta,
+        AvoidableSpend,
+        AnomalySeverity,
+        IsAnomaly,
+        AvgAttributionConfidence,
+        Subscriptions,
+        AnomalyExplanation
+}
