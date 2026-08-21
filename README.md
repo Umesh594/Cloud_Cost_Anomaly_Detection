@@ -51,6 +51,19 @@ kubectl apply -f infra/k8s/deployment.yaml
 - Demonstrates distributed systems fundamentals: idempotent polling windows, retries, structured logging, OpenTelemetry, health checks, horizontal scaling, and managed identity.
 - Shows FinOps product thinking: chargeback confidence, ownership attribution source, ADX report queries, and IaC governance.
 
+## Beyond FinOps: the anomaly-detection core is domain-general
+
+`series_decompose_anomalies()` and the local `CostAnomalyRanker` fallback
+have nothing FinOps-specific in their math — both are seasonal time-series
+decomposition over a numeric value grouped by dimensions. `kql/device-
+telemetry-anomalies.kql` applies the identical technique to device/hardware
+telemetry (CPU%, battery drain, packet-drop rate) instead of daily spend,
+shaped to match what a native ETW provider would export at scale — see the
+`chrono_feed` project's `ProcessTelemetry` event for a concrete producer of
+that shape. Same pipeline pattern, different signal: this is the piece that
+maps the "telemetry and trace data ... at scale" side of a device-
+fundamentals role onto something this repo already does well for cost data.
+
 ## Important Configuration
 
 Set these as environment variables, Kubernetes config, or `appsettings` overrides:

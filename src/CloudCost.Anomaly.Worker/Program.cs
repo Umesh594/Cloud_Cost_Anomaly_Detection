@@ -1,3 +1,4 @@
+using Azure.Monitor.OpenTelemetry.Exporter;
 using CloudCost.Anomaly.Core;
 using CloudCost.Anomaly.Worker;
 using CloudCost.Anomaly.Worker.Services;
@@ -24,6 +25,7 @@ builder.Services.AddSingleton<ChargebackEngine>(sp =>
     return new ChargebackEngine(options.Teams);
 });
 builder.Services.AddSingleton<CostAnomalyRanker>();
+builder.Services.AddSingleton<DataGovernancePolicy>();
 builder.Services.AddSingleton<TerraformTagScanner>(sp =>
 {
     var options = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<OwnershipPolicyOptions>>().Value;
@@ -37,12 +39,24 @@ builder.Services.AddSingleton<WorkerHealthState>();
 builder.Services.AddHostedService<CostAnomalyWorker>();
 builder.Services.AddHealthChecks().AddCheck<WorkerHealthCheck>("worker");
 
+var applicationInsightsConnectionString = builder.Configuration["Observability:ApplicationInsightsConnectionString"];
 builder.Services.AddOpenTelemetry()
     .ConfigureResource(resource => resource.AddService("cloud-cost-anomaly-worker"))
-    .WithTracing(tracing => tracing
-        .AddSource("CloudCost.Anomaly")
-        .AddHttpClientInstrumentation()
-        .AddOtlpExporter());
+    .WithTracing(tracing =>
+    {
+        tracing
+            .AddSource("CloudCost.Anomaly")
+            .AddHttpClientInstrumentation()
+            .AddOtlpExporter();
+
+        if (!string.IsNullOrWhiteSpace(applicationInsightsConnectionString))
+        {
+            tracing.AddAzureMonitorTraceExporter(options =>
+            {
+                options.ConnectionString = applicationInsightsConnectionString;
+            });
+        }
+    });
 
 builder.Logging.ClearProviders();
 builder.Logging.AddSerilog(new LoggerConfiguration()

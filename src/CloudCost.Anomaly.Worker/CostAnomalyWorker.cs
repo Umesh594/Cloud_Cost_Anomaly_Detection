@@ -9,6 +9,7 @@ public sealed class CostAnomalyWorker(
     IAdxCostRepository adxRepository,
     ChargebackEngine chargebackEngine,
     CostAnomalyRanker fallbackRanker,
+    DataGovernancePolicy dataGovernancePolicy,
     TerraformTagScanner tagScanner,
     IAlertPublisher alertPublisher,
     WorkerHealthState healthState,
@@ -55,12 +56,14 @@ public sealed class CostAnomalyWorker(
         logger.LogInformation("Polling Azure Cost Management from {Since:o} to {Until:o}", since, started);
         var records = await costClient.QueryDailyCostsAsync(since, started, cancellationToken);
         var allocations = chargebackEngine.Allocate(records);
+        var governedRecords = dataGovernancePolicy.Normalize(records);
+        var governedAllocations = dataGovernancePolicy.Normalize(allocations);
 
-        await adxRepository.IngestCostsAsync(records, cancellationToken);
-        await adxRepository.IngestChargebackAsync(allocations, cancellationToken);
+        await adxRepository.IngestCostsAsync(governedRecords, cancellationToken);
+        await adxRepository.IngestChargebackAsync(governedAllocations, cancellationToken);
 
         var adxAnomalies = await adxRepository.QueryAnomaliesAsync(options.Value.AlertMinimumCostDelta, cancellationToken);
-        var fallbackAnomalies = fallbackRanker.Rank(allocations)
+        var fallbackAnomalies = fallbackRanker.Rank(governedAllocations)
             .Where(x => x.ActualCost - x.ExpectedCost >= options.Value.AlertMinimumCostDelta)
             .ToArray();
 
@@ -69,8 +72,8 @@ public sealed class CostAnomalyWorker(
 
         logger.LogInformation(
             "Cycle complete. Records={RecordCount}, Allocations={AllocationCount}, Anomalies={AnomalyCount}, TagFindings={FindingCount}",
-            records.Count,
-            allocations.Count,
+            governedRecords.Count,
+            governedAllocations.Count,
             adxAnomalies.Count + fallbackAnomalies.Length,
             findings.Count);
     }

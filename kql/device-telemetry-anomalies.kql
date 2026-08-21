@@ -1,0 +1,56 @@
+// ─── Device/hardware telemetry anomaly detection ───────────────────────────
+//
+// The FinOps use case in this repo detects cost anomalies with
+// series_decompose_anomalies() over daily spend. That function has nothing
+// FinOps-specific about it -- it's a generic seasonal time-series
+// decomposition, and the same pattern applies directly to device/hardware
+// telemetry: CPU%, battery drain rate, packet-drop counts, or latency
+// percentiles sampled at regular intervals.
+//
+// This table is intentionally shaped to match what a native ETW provider
+// would export at scale -- e.g. the ChronoFeed project's ProcessTelemetry
+// event (see that repo's src/telemetry/etw_provider.cpp): DeviceId,
+// MetricName, MetricValue, Timestamp. Point an ADX event-hub/Event Grid
+// ingestion pipeline at exported .etl-derived events (via tracerpt -> CSV/
+// JSON, or a custom ETW consumer) and this table + function pair work
+// unmodified.
+
+.create-merge table DeviceTelemetry (
+    Timestamp: datetime,
+    DeviceId: string,
+    MetricName: string,       // e.g. "ProcessCpuPercent", "BatteryPercent", "PacketDropRate"
+    MetricValue: real
+)
+
+.create-or-alter function with (folder="DeviceFundamentals", docstring="Per-device/per-metric telemetry anomalies using the same ADX time-series decomposition as the FinOps cost pipeline")
+Device_MetricAnomalies(lookbackDays: int = 14, sensitivity: real = 1.5) {
+    DeviceTelemetry
+    | where Timestamp > ago(lookbackDays * 1d)
+    | make-series ActualValue=avg(MetricValue) default=0
+        on Timestamp from startofday(ago(lookbackDays * 1d)) to startofday(now()) step 1h
+        by DeviceId, MetricName
+    | extend (Anomalies, Score, Baseline) = series_decompose_anomalies(ActualValue, sensitivity, -1, "linefit")
+    | mv-expand Timestamp to typeof(datetime),
+        ActualValue to typeof(double),
+        Baseline to typeof(double),
+        Score to typeof(double),
+        Anomalies to typeof(double)
+    | where Anomalies != 0
+    | project
+        Timestamp,
+        DeviceId,
+        MetricName,
+        ActualValue,
+        ExpectedValue = Baseline,
+        Delta = ActualValue - Baseline,
+        Direction = iif(Anomalies > 0, "above baseline", "below baseline"),
+        Severity = round(min_of(1.0, abs(Score) / 5.0), 3)
+    | order by Severity desc, abs(Delta) desc
+}
+
+// Example: which devices had a CPU% regression (a busy-spin thread eating a
+// full core, the exact failure mode chrono_feed's dashboard would show as a
+// latency win but a battery-life loss) in the last 14 days?
+//
+//   Device_MetricAnomalies(14, 1.5)
+//   | where MetricName == "ProcessCpuPercent" and Direction == "above baseline"
