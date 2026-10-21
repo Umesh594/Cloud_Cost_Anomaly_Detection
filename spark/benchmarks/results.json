@@ -1,0 +1,36 @@
+{
+  "spark": {
+    "100000": {
+      "generate_seconds": 35.71,
+      "generate_rows_per_sec": 2800.6,
+      "aggregate_seconds": 80.67,
+      "aggregate_rows_per_sec": 1239.7
+    },
+    "1000000": {
+      "generate_seconds": 35.67,
+      "generate_rows_per_sec": 28037.8,
+      "aggregate_seconds": 153.76,
+      "aggregate_rows_per_sec": 6503.5
+    },
+    "5000000": {
+      "generate_seconds": 91.53,
+      "generate_rows_per_sec": 54627.0,
+      "aggregate_seconds": 167.13,
+      "aggregate_rows_per_sec": 29916.8
+    }
+  },
+  "pandas_naive": {
+    "100000": {
+      "aggregate_seconds": 0.057,
+      "aggregate_rows_per_sec": 1759097.4,
+      "group_count": 97226,
+      "team_count": 30
+    },
+    "1000000": {
+      "aggregate_seconds": 0.529,
+      "aggregate_rows_per_sec": 1888835.2,
+      "group_count": 775642,
+      "team_count": 30
+    }
+  }
+}

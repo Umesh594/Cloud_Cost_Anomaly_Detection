@@ -13,3 +13,9 @@ crash.*.log
 
 .env
 *.user
+
+# Generated synthetic datasets / benchmark logs (not committed: large,
+# reproducible from spark/jobs/generate_synthetic_costs.py)
+spark/data/*
+!spark/data/.gitkeep
+spark/benchmarks/run.log

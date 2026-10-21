@@ -1,0 +1,38 @@
+// Print-service telemetry for Azure Monitor / Application Insights / ADX analysis.
+// This is not a Microsoft Universal Print integration; it models the same class
+// of production cloud-service signals: queue latency, failures, stuck jobs, and
+// privacy-safe device/user identifiers.
+
+.create-merge table PrintJobTelemetry (
+    Timestamp: datetime,
+    TenantHash: string,
+    PrinterHash: string,
+    QueueHash: string,
+    UserHash: string,
+    ClientOs: string,
+    ConnectorVersion: string,
+    Status: string,
+    PageCount: int,
+    PayloadBytes: long,
+    QueueLatencySeconds: real
+)
+
+.create-or-alter function with (
+    folder = "ServiceReliability",
+    docstring = "Print-service queue health summary for live-site investigation"
+)
+PrintService_QueueHealth(minutesBack: int = 60) {
+    PrintJobTelemetry
+    | where Timestamp > ago(minutesBack * 1m)
+    | summarize
+        TotalJobs=count(),
+        Completed=countif(Status == "completed"),
+        Failed=countif(Status == "failed"),
+        Stuck=countif(Status !in ("completed", "failed", "cancelled") and Timestamp < ago(15m)),
+        FailureRatePct=round(100.0 * countif(Status == "failed") / count(), 2),
+        P95QueueLatencySeconds=round(percentile(QueueLatencySeconds, 95), 2),
+        LargestPayloadMb=round(max(PayloadBytes) / 1024.0 / 1024.0, 2)
+        by QueueHash, ClientOs, ConnectorVersion
+    | extend HealthState = iff(FailureRatePct >= 5 or P95QueueLatencySeconds >= 120 or Stuck > 0, "Degraded", "Healthy")
+    | order by HealthState asc, FailureRatePct desc, P95QueueLatencySeconds desc
+}

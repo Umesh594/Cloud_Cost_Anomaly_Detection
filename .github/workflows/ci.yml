@@ -19,9 +19,74 @@ jobs:
       - name: Restore
         run: dotnet restore CloudCost.AnomalyDetection.sln
       - name: Test
-        run: dotnet test CloudCost.AnomalyDetection.sln --configuration Release --no-restore --collect:"XPlat Code Coverage"
+        run: dotnet test CloudCost.AnomalyDetection.sln --configuration Release --no-restore --collect:"XPlat Code Coverage" --results-directory ./coverage
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/**/coverage.cobertura.xml
+          retention-days: 7
       - name: Build image
         run: docker build -t cloud-cost-anomaly-worker:${{ github.sha }} .
+
+  coverage-gate:
+    needs: build-test-image
+    runs-on: ubuntu-latest
+    env:
+      # A few points below the measured baseline (~80% line coverage) at
+      # the time this gate was introduced, so normal variance doesn't
+      # cause false failures. Raise over time; don't lower to pass a PR.
+      MIN_LINE_COVERAGE: "75"
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Install reportgenerator
+        run: dotnet tool install -g dotnet-reportgenerator-globaltool
+      - name: Generate coverage summary
+        run: |
+          ~/.dotnet/tools/reportgenerator \
+            "-reports:coverage/**/coverage.cobertura.xml" \
+            "-targetdir:coverage-report" \
+            "-reporttypes:TextSummary"
+          cat coverage-report/Summary.txt
+      - name: Enforce coverage threshold
+        run: |
+          LINE_COVERAGE=$(grep "Line coverage:" coverage-report/Summary.txt | head -1 | grep -oE '[0-9]+(\.[0-9]+)?' | head -1)
+          echo "Measured line coverage: ${LINE_COVERAGE}%"
+          echo "Required minimum: ${MIN_LINE_COVERAGE}%"
+          awk -v cov="$LINE_COVERAGE" -v min="$MIN_LINE_COVERAGE" 'BEGIN { exit !(cov >= min) }' \
+            || { echo "Coverage ${LINE_COVERAGE}% is below the required ${MIN_LINE_COVERAGE}% threshold"; exit 1; }
+
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Restore
+        run: dotnet restore CloudCost.AnomalyDetection.sln
+      - name: .NET dependency vulnerability scan
+        run: dotnet list CloudCost.AnomalyDetection.sln package --vulnerable --include-transitive | tee dotnet-vulnerable.txt
+      - name: Fail on known .NET vulnerabilities
+        run: |
+          if grep -qi "has the following vulnerable packages" dotnet-vulnerable.txt; then
+            echo "Known-vulnerable NuGet packages found; see job output above."
+            exit 1
+          fi
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install pip-audit
+        run: pip install pip-audit==2.7.3
+      - name: Python (Spark job) dependency vulnerability scan
+        working-directory: spark
+        run: pip-audit -r requirements.txt
 
   terraform-validate:
     runs-on: ubuntu-latest
@@ -37,3 +102,19 @@ jobs:
       - name: Validate
         working-directory: infra/terraform
         run: terraform validate
+
+  # Single job to mark as a required status check in branch protection
+  # (see docs/CONTRIBUTING.md). Renaming/splitting the jobs above would
+  # otherwise silently break a protection rule that names them individually.
+  required-checks:
+    if: always()
+    needs: [build-test-image, coverage-gate, security-scan, terraform-validate]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify all required checks passed
+        run: |
+          if [ "${{ contains(needs.*.result, 'failure') }}" = "true" ] || [ "${{ contains(needs.*.result, 'cancelled') }}" = "true" ]; then
+            echo "One or more required checks failed or were cancelled."
+            exit 1
+          fi
+          echo "All required checks passed."

@@ -11,5 +11,4 @@ public sealed class AnomalyWorkerOptions
     public int PollIntervalMinutes { get; set; } = 60;
     public int LookbackDays { get; set; } = 35;
     public decimal AlertMinimumCostDelta { get; set; } = 100;
-    public string AlertWebhookUrl { get; set; } = string.Empty;
 }

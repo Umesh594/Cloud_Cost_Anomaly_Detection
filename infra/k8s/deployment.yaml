@@ -35,6 +35,20 @@ spec:
               value: CloudCost
             - name: AnomalyWorker__AlertMinimumCostDelta
               value: "100"
+            # Only the ADX sink is enabled by default: the webhook sink needs a URL and the file/blob
+            # archive sink needs a writable volume mount, neither of which this manifest provisions.
+            # readOnlyRootFilesystem below is only safe to keep as long as that stays true - mount a
+            # volume at the archive sink's configured directory before adding "archive" here.
+            - name: EventPublishing__EnabledSinks__0
+              value: adx
+            - name: EventPublishing__Adx__Table
+              value: PublishedEvents
+            - name: Observability__ApplicationInsightsConnectionString
+              valueFrom:
+                secretKeyRef:
+                  name: cloud-cost-anomaly
+                  key: application-insights-connection-string
+                  optional: true
           resources:
             requests:
               cpu: 100m

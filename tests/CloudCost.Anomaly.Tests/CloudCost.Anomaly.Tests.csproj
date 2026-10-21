@@ -13,5 +13,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\CloudCost.Anomaly.Core\CloudCost.Anomaly.Core.csproj" />
+    <ProjectReference Include="..\..\src\CloudCost.Anomaly.Worker\CloudCost.Anomaly.Worker.csproj" />
   </ItemGroup>
 </Project>

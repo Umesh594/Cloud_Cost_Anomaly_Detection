@@ -40,8 +40,7 @@ public sealed class AdxCostRepository(IOptions<AnomalyWorkerOptions> options, IL
             return [];
         }
 
-        var kcsb = new KustoConnectionStringBuilder(options.Value.AdxClusterUri, options.Value.AdxDatabase)
-            .WithAadAzureTokenCredentialsAuthentication(new Azure.Identity.DefaultAzureCredential());
+        var kcsb = KustoConnections.BuildConnectionString(options.Value.AdxClusterUri, options.Value.AdxDatabase);
         using var client = KustoClientFactory.CreateCslQueryProvider(kcsb);
         using var reader = await client.ExecuteQueryAsync(options.Value.AdxDatabase, BuildAnomalyQuery(minimumDelta), new ClientRequestProperties());
 
@@ -63,8 +62,7 @@ public sealed class AdxCostRepository(IOptions<AnomalyWorkerOptions> options, IL
 
     private async Task ExecuteControlCommandAsync(string command, CancellationToken cancellationToken)
     {
-        var kcsb = new KustoConnectionStringBuilder(options.Value.AdxClusterUri, options.Value.AdxDatabase)
-            .WithAadAzureTokenCredentialsAuthentication(new Azure.Identity.DefaultAzureCredential());
+        var kcsb = KustoConnections.BuildConnectionString(options.Value.AdxClusterUri, options.Value.AdxDatabase);
         using var adminClient = KustoClientFactory.CreateCslAdminProvider(kcsb);
         using var _ = await adminClient.ExecuteControlCommandAsync(options.Value.AdxDatabase, command, new ClientRequestProperties());
     }

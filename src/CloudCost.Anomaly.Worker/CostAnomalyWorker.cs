@@ -1,5 +1,7 @@
 using CloudCost.Anomaly.Core;
+using CloudCost.Anomaly.Core.Publishing;
 using CloudCost.Anomaly.Worker.Services;
+using CloudCost.Anomaly.Worker.Services.Publishing;
 using Microsoft.Extensions.Options;
 
 namespace CloudCost.Anomaly.Worker;
@@ -11,7 +13,7 @@ public sealed class CostAnomalyWorker(
     CostAnomalyRanker fallbackRanker,
     DataGovernancePolicy dataGovernancePolicy,
     TerraformTagScanner tagScanner,
-    IAlertPublisher alertPublisher,
+    EventPublishingChannel eventChannel,
     WorkerHealthState healthState,
     IOptions<AnomalyWorkerOptions> options,
     ILogger<CostAnomalyWorker> logger) : BackgroundService
@@ -66,15 +68,55 @@ public sealed class CostAnomalyWorker(
         var fallbackAnomalies = fallbackRanker.Rank(governedAllocations)
             .Where(x => x.ActualCost - x.ExpectedCost >= options.Value.AlertMinimumCostDelta)
             .ToArray();
+        var anomalies = adxAnomalies.Concat(fallbackAnomalies).ToArray();
 
         var findings = tagScanner.Scan(options.Value.TerraformRoot);
-        await alertPublisher.PublishAsync(adxAnomalies.Concat(fallbackAnomalies), findings, cancellationToken);
+
+        PublishFanOut(anomalies, governedAllocations, findings, started);
 
         logger.LogInformation(
             "Cycle complete. Records={RecordCount}, Allocations={AllocationCount}, Anomalies={AnomalyCount}, TagFindings={FindingCount}",
             governedRecords.Count,
             governedAllocations.Count,
-            adxAnomalies.Count + fallbackAnomalies.Length,
+            anomalies.Length,
             findings.Count);
+    }
+
+    private void PublishFanOut(
+        IReadOnlyCollection<AnomalyScore> anomalies,
+        IReadOnlyCollection<ChargebackAllocation> allocations,
+        IReadOnlyCollection<TerraformTagFinding> findings,
+        DateTimeOffset observedAt)
+    {
+        var dropped = 0;
+
+        foreach (var anomaly in anomalies)
+        {
+            if (!eventChannel.TryPublish(EventEnvelopeFactory.FromAnomaly(anomaly)))
+            {
+                dropped++;
+            }
+        }
+
+        foreach (var allocation in allocations)
+        {
+            if (!eventChannel.TryPublish(EventEnvelopeFactory.FromChargebackAllocation(allocation)))
+            {
+                dropped++;
+            }
+        }
+
+        foreach (var finding in findings)
+        {
+            if (!eventChannel.TryPublish(EventEnvelopeFactory.FromOwnershipFinding(finding, observedAt)))
+            {
+                dropped++;
+            }
+        }
+
+        if (dropped > 0)
+        {
+            logger.LogWarning("Fan-out publishing channel rejected {Dropped} event(s) under backpressure this cycle", dropped);
+        }
     }
 }

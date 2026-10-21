@@ -1,0 +1,30 @@
+# CODEOWNERS
+#
+# GitHub requests a review from the matched owner(s) whenever a PR touches
+# these paths. Combined with a branch protection rule requiring code owner
+# review (see docs/CONTRIBUTING.md), this makes review non-optional for the
+# paths that matter most: the .NET chargeback/anomaly core, Azure
+# integrations, infrastructure-as-code, and the Spark batch pipeline.
+#
+# Replace @Umesh594 with the real team/handle once more than one maintainer
+# is active on this repo.
+
+*                               @Umesh594
+
+# Core domain logic: chargeback allocation, anomaly ranking, IaC ownership
+src/CloudCost.Anomaly.Core/     @Umesh594
+
+# Azure integrations: Cost Management, ADX ingestion/query, alerting
+src/CloudCost.Anomaly.Worker/   @Umesh594
+
+# Spark/Synapse batch ETL
+spark/                          @Umesh594
+
+# Infrastructure as code
+infra/                          @Umesh594
+
+# CI/CD and required-checks configuration
+.github/                        @Umesh594
+
+# KQL (ADX schema, anomaly functions, chargeback/report queries)
+kql/                            @Umesh594
